@@ -59,6 +59,28 @@ void arp_print()
 void arp_req(uint8_t *target_ip)
 {
     // TO-DO
+    // buf_init(&txbuf, ETHERNET_MIN_TRANSPORT_UNIT + sizeof(ether_hdr_t));
+    buf_init(&txbuf, ETHERNET_MIN_TRANSPORT_UNIT - sizeof(arp_pkt_t));
+    buf_add_header(&txbuf, sizeof(arp_pkt_t));
+    arp_pkt_t *hdr = (arp_pkt_t *)txbuf.data;
+    hdr->hw_type16 = swap16(ARP_HW_ETHER);
+    hdr->hw_len = NET_MAC_LEN;
+    hdr->pro_type16 = swap16(NET_PROTOCOL_IP);
+    hdr->pro_len = NET_IP_LEN;
+    hdr->opcode16 = swap16(ARP_REQUEST);
+
+    uint8_t sender_mac[NET_MAC_LEN] = NET_IF_MAC;
+    memcpy(hdr->sender_mac, sender_mac, NET_MAC_LEN);
+    uint8_t sender_ip[NET_IP_LEN] = NET_IF_IP;
+    memcpy(hdr->sender_ip, sender_ip, NET_IP_LEN);
+
+    memset(hdr->target_mac, 0, NET_MAC_LEN);
+    memcpy(hdr->target_ip, target_ip, NET_IP_LEN);
+
+    uint8_t default_mac[NET_MAC_LEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+
+    ethernet_out(&txbuf, default_mac, NET_PROTOCOL_ARP);
+    // ethernet_out(&txbuf, default_mac, NET_PROTOCOL_IP);
 }
 
 /**
@@ -70,6 +92,26 @@ void arp_req(uint8_t *target_ip)
 void arp_resp(uint8_t *target_ip, uint8_t *target_mac)
 {
     // TO-DO
+    // buf_init(&txbuf, ETHERNET_MIN_TRANSPORT_UNIT + sizeof(ether_hdr_t));
+    buf_init(&txbuf, ETHERNET_MIN_TRANSPORT_UNIT - sizeof(arp_pkt_t));
+    buf_add_header(&txbuf, sizeof(arp_pkt_t));
+    arp_pkt_t *hdr = (arp_pkt_t *)txbuf.data;
+    hdr->hw_type16 = swap16(ARP_HW_ETHER);
+    hdr->hw_len = NET_MAC_LEN;
+    hdr->pro_type16 = swap16(NET_PROTOCOL_IP);
+    hdr->pro_len = NET_IP_LEN;
+    hdr->opcode16 = swap16(ARP_REPLY);
+
+    uint8_t sender_mac[NET_MAC_LEN] = NET_IF_MAC;
+    memcpy(hdr->sender_mac, sender_mac, NET_MAC_LEN);
+    uint8_t sender_ip[NET_IP_LEN] = NET_IF_IP;
+    memcpy(hdr->sender_ip, sender_ip, NET_IP_LEN);
+
+    memcpy(hdr->target_mac, target_mac, NET_MAC_LEN);
+    memcpy(hdr->target_ip, target_ip, NET_IP_LEN);
+
+    ethernet_out(&txbuf, target_mac, NET_PROTOCOL_ARP);
+    // ethernet_out(&txbuf, target_mac, NET_PROTOCOL_IP);
 }
 
 /**
@@ -81,6 +123,41 @@ void arp_resp(uint8_t *target_ip, uint8_t *target_mac)
 void arp_in(buf_t *buf, uint8_t *src_mac)
 {
     // TO-DO
+    if (buf->len < sizeof(arp_pkt_t)) {
+        return;
+    }
+    arp_pkt_t *arp_hdr = (arp_pkt_t *)buf->data;
+    if (swap16(arp_hdr->hw_type16) != ARP_HW_ETHER) {
+        return;
+    }
+    if (swap16(arp_hdr->pro_type16) != NET_PROTOCOL_IP) {
+        return;
+    }
+    if (arp_hdr->hw_len != NET_MAC_LEN) {
+        return;
+    }
+    if (arp_hdr->pro_len != NET_IP_LEN) {
+        return;
+    }
+    if (swap16(arp_hdr->opcode16) != ARP_REQUEST &&
+        swap16(arp_hdr->opcode16) != ARP_REPLY) {
+        return;
+    }
+    map_set(&arp_table, arp_hdr->sender_ip, arp_hdr->sender_mac);
+    buf_t *tmp_arp_buf = map_get(&arp_buf, arp_hdr->sender_ip);
+    if (tmp_arp_buf) {
+        // receive an arp response 
+        ethernet_out(tmp_arp_buf, arp_hdr->sender_mac, NET_PROTOCOL_IP);
+        map_delete(&arp_buf, arp_hdr->sender_ip);
+    } else {
+        uint8_t ip[NET_IP_LEN] = NET_IF_IP;
+        if (swap16(arp_hdr->opcode16) == ARP_REQUEST &&
+            memcmp(arp_hdr->target_ip, ip, NET_IP_LEN) == 0) {
+            // receive an arp request
+            arp_resp(arp_hdr->sender_ip, arp_hdr->sender_mac);
+        }
+    }
+
 }
 
 /**
@@ -93,6 +170,18 @@ void arp_in(buf_t *buf, uint8_t *src_mac)
 void arp_out(buf_t *buf, uint8_t *ip)
 {
     // TO-DO
+    uint8_t *mac = map_get(&arp_table, ip);
+    if (mac) {
+        // TODO: not sure
+        ethernet_out(buf, mac, NET_PROTOCOL_IP);
+        // ethernet_out(buf, mac, NET_PROTOCOL_ARP);
+    } else {
+        buf_t *tmp_arp_buf = map_get(&arp_buf, ip);
+        if (!tmp_arp_buf) {
+            map_set(&arp_buf, ip, buf);
+            arp_req(ip);
+        }
+    }
 }
 
 /**
