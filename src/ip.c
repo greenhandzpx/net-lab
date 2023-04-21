@@ -77,7 +77,9 @@ void ip_fragment_out(buf_t *buf, uint8_t *ip, net_protocol_t protocol, int id, u
     // hdr->id16 = id;
     hdr->id16 = swap16(id);
     // TODO not sure
-    hdr->flags_fragment16 = swap16(mf);
+    hdr->flags_fragment16 = swap16((mf << 13) | (offset >> 3));
+    // hdr->flags_fragment16 = 0;
+
     hdr->ttl = 64;
     hdr->protocol = protocol;
     hdr->hdr_checksum16 = 0;
@@ -109,10 +111,14 @@ void ip_out(buf_t *buf, uint8_t *ip, net_protocol_t protocol)
         // sharded
         size_t offset = 0;
         while (buf->len > 0) {
-            buf_t ip_buf;
             size_t len = buf->len > max_len ? max_len : buf->len; 
-            buf_init(&ip_buf, len);
-            buf_copy(&ip_buf, buf, len);
+
+            buf_t ip_buf;
+            buf_init(&ip_buf, 0);
+            buf_add_header(&ip_buf, len);
+            memcpy(ip_buf.data, buf->data, len);
+            // buf_copy(&ip_buf, buf, len);
+
             buf_remove_header(buf, len);
             if (buf->len > 0) {
                 ip_fragment_out(&ip_buf, ip, protocol, id, offset, 1);
