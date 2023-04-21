@@ -1,4 +1,6 @@
 #include "utils.h"
+#include <bits/stdint-uintn.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 /**
@@ -68,6 +70,15 @@ uint8_t ip_prefix_match(uint8_t *ipa, uint8_t *ipb)
     return count;
 }
 
+
+static uint16_t add_two_num(uint16_t lhs, uint16_t rhs) {
+    uint32_t sum = lhs + rhs;
+    while (sum >> 16) {
+        sum = (sum >> 16) + (sum & 0xffff);
+    }
+    return sum;
+}
+
 /**
  * @brief 计算16位校验和
  * 
@@ -78,4 +89,18 @@ uint8_t ip_prefix_match(uint8_t *ipa, uint8_t *ipb)
 uint16_t checksum16(uint16_t *data, size_t len)
 {
     // TO-DO
+    uint32_t res = 0;
+    for (size_t idx = 0; idx < len; idx += 2) {
+        // idx is counted by `byte`
+        uint16_t cur = 0;
+        if (idx == len - 1) {
+            // only 8bit left
+            cur = *((uint8_t *)data + idx);
+        } else {
+            cur = data[idx >> 1];
+        }
+        // res += cur;
+        res = add_two_num(res, cur);
+    }
+    return ~res;
 }

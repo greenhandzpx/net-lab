@@ -61,6 +61,7 @@ void arp_req(uint8_t *target_ip)
     // TO-DO
     // buf_init(&txbuf, ETHERNET_MIN_TRANSPORT_UNIT + sizeof(ether_hdr_t));
     buf_init(&txbuf, ETHERNET_MIN_TRANSPORT_UNIT - sizeof(arp_pkt_t));
+
     buf_add_header(&txbuf, sizeof(arp_pkt_t));
     arp_pkt_t *hdr = (arp_pkt_t *)txbuf.data;
     hdr->hw_type16 = swap16(ARP_HW_ETHER);
