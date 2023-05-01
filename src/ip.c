@@ -47,11 +47,13 @@ void ip_in(buf_t *buf, uint8_t *src_mac)
         buf_remove_padding(buf, buf->len - total_len);
     }
     uint8_t protocol = hdr->protocol;
-    buf_remove_header(buf, sizeof(ip_hdr_t));
-    
-    if (net_in(buf, protocol, hdr->src_ip) != 0) {
+
+    if (protocol != NET_PROTOCOL_ICMP && protocol != NET_PROTOCOL_UDP) {
         icmp_unreachable(buf, hdr->src_ip, ICMP_CODE_PROTOCOL_UNREACH);
     }
+    
+    buf_remove_header(buf, sizeof(ip_hdr_t));
+    net_in(buf, protocol, hdr->src_ip);
 
 }
 

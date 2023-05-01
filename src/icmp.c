@@ -1,6 +1,8 @@
+#include "buf.h"
 #include "net.h"
 #include "icmp.h"
 #include "ip.h"
+#include "utils.h"
 
 /**
  * @brief 发送icmp响应
@@ -11,6 +13,17 @@
 static void icmp_resp(buf_t *req_buf, uint8_t *src_ip)
 {
     // TO-DO
+    buf_init(&txbuf, 0);
+    buf_add_header(&txbuf, req_buf->len);
+    memcpy(txbuf.data, req_buf->data, req_buf->len);
+    icmp_hdr_t *hdr = (icmp_hdr_t *)txbuf.data;
+    hdr->type = ICMP_TYPE_ECHO_REPLY;
+    hdr->code = 0;
+    hdr->checksum16 = 0;
+    hdr->checksum16 = checksum16((uint16_t *)hdr, txbuf.len);
+    // hdr->checksum16 = checksum16((uint16_t *)hdr, sizeof(icmp_hdr_t)) + 10;
+    ip_out(&txbuf, src_ip, NET_PROTOCOL_ICMP);
+    
 }
 
 /**
@@ -22,6 +35,13 @@ static void icmp_resp(buf_t *req_buf, uint8_t *src_ip)
 void icmp_in(buf_t *buf, uint8_t *src_ip)
 {
     // TO-DO
+    if (buf->len < sizeof(icmp_hdr_t)) {
+        return;
+    }
+    icmp_hdr_t *hdr = (icmp_hdr_t *)buf->data;
+    if (hdr->type == ICMP_TYPE_ECHO_REQUEST) {
+        icmp_resp(buf, src_ip);
+    }
 }
 
 /**
@@ -34,6 +54,18 @@ void icmp_in(buf_t *buf, uint8_t *src_ip)
 void icmp_unreachable(buf_t *recv_buf, uint8_t *src_ip, icmp_code_t code)
 {
     // TO-DO
+    buf_init(&txbuf, 0);
+    buf_add_header(&txbuf, sizeof(ip_hdr_t) + 8);
+    memcpy(txbuf.data, recv_buf->data, sizeof(ip_hdr_t) + 8);
+    buf_add_header(&txbuf, sizeof(icmp_hdr_t));
+    icmp_hdr_t *hdr = (icmp_hdr_t *)txbuf.data;
+    hdr->type = ICMP_TYPE_UNREACH;
+    hdr->code = code;
+    hdr->id16 = 0;
+    hdr->seq16 = 0;
+    hdr->checksum16 = 0;
+    hdr->checksum16 = checksum16((uint16_t *)hdr, txbuf.len);
+    ip_out(&txbuf, src_ip, NET_PROTOCOL_ICMP);
 }
 
 /**
