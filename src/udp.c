@@ -4,13 +4,13 @@
 
 /**
  * @brief udp处理程序表
- * 
+ *
  */
 map_t udp_table;
 
 /**
  * @brief udp伪校验和计算
- * 
+ *
  * @param buf 要计算的包
  * @param src_ip 源ip地址
  * @param dst_ip 目的ip地址
@@ -19,22 +19,80 @@ map_t udp_table;
 static uint16_t udp_checksum(buf_t *buf, uint8_t *src_ip, uint8_t *dst_ip)
 {
     // TO-DO
+    uint16_t total_len = swap16(buf->len);
+    buf_add_header(buf, sizeof(ip_hdr_t));
+    ip_hdr_t tmp_ip_hdr;
+    memcpy(&tmp_ip_hdr, buf->data, sizeof(ip_hdr_t));
+    buf_remove_header(buf, sizeof(ip_hdr_t));
+
+    buf_add_header(buf, sizeof(udp_peso_hdr_t));
+    udp_peso_hdr_t *hdr = (udp_peso_hdr_t *)(buf->data);
+    memcpy(hdr->src_ip, src_ip, NET_IP_LEN);
+    memcpy(hdr->dst_ip, dst_ip, NET_IP_LEN);
+    hdr->total_len16 = total_len;
+    hdr->placeholder = 0;
+    hdr->protocol = tmp_ip_hdr.protocol;
+
+    uint16_t checksum = checksum16((uint16_t *)buf->data, buf->len);
+    buf_remove_header(buf, sizeof(udp_peso_hdr_t));
+    buf_add_header(buf, sizeof(ip_hdr_t));
+    memcpy(buf->data, &tmp_ip_hdr, sizeof(ip_hdr_t));
+    buf_remove_header(buf, sizeof(ip_hdr_t));
+
+    return checksum;
+    // copy back
 }
 
 /**
  * @brief 处理一个收到的udp数据包
- * 
+ *
  * @param buf 要处理的包
  * @param src_ip 源ip地址
  */
 void udp_in(buf_t *buf, uint8_t *src_ip)
 {
     // TO-DO
+    if (buf->len < sizeof(udp_hdr_t)) {
+        return;
+    }
+    udp_hdr_t *hdr = (udp_hdr_t *)(buf->data);
+    uint16_t checksum = hdr->checksum16;
+    hdr->checksum16 = 0;
+    uint8_t dst_ip[NET_IP_LEN] = NET_IF_IP;
+    if (udp_checksum(buf, src_ip, dst_ip) != checksum) {
+        return;
+    }
+    hdr->checksum16 = checksum;
+    udp_handler_t handler = (udp_handler_t )map_get(&udp_table, swap16(hdr->dst_port16));
+    if (handler == NULL) {
+        buf_add_header(buf, sizeof(ip_hdr_t));
+        ip_hdr_t *ip_hdr = (ip_hdr_t *)(buf->data);
+        ip_hdr->hdr_len = 5;
+        ip_hdr->version = IP_VERSION_4;
+        ip_hdr->tos = 0;
+        ip_hdr->total_len16 = swap16(buf->len);
+        // TODO
+        ip_hdr->id16 = 0;
+        ip_hdr->flags_fragment16 = 0;
+        ip_hdr->ttl = 64;
+        ip_hdr->protocol = NET_PROTOCOL_UDP;
+        uint8_t local_ip[NET_IP_LEN] = NET_IF_IP;
+        memcpy(ip_hdr->src_ip, local_ip, NET_IP_LEN);
+        memcpy(ip_hdr->dst_ip, src_ip, NET_IP_LEN);
+        ip_hdr->hdr_checksum16 = 0;
+        ip_hdr->hdr_checksum16 = checksum16((uint16_t *)ip_hdr, sizeof(ip_hdr_t));
+
+        icmp_unreachable(buf, src_ip, ICMP_TYPE_UNREACH);
+    } else {
+        buf_remove_header(buf, sizeof(udp_hdr_t));
+        handler(buf->data, buf->len, src_ip, swap16(hdr->src_port16));
+    }
+
 }
 
 /**
  * @brief 处理一个要发送的数据包
- * 
+ *
  * @param buf 要处理的包
  * @param src_port 源端口号
  * @param dst_ip 目的ip地址
@@ -43,11 +101,19 @@ void udp_in(buf_t *buf, uint8_t *src_ip)
 void udp_out(buf_t *buf, uint16_t src_port, uint8_t *dst_ip, uint16_t dst_port)
 {
     // TO-DO
+    buf_add_header(buf, sizeof(udp_hdr_t));
+    udp_hdr_t *hdr = (udp_hdr_t *)(buf->data);
+    hdr->src_port16 = swap16(src_port);
+    hdr->dst_port16 = swap16(dst_port);
+    hdr->total_len16 = swap16(buf->len);
+    uint8_t src_ip[NET_IP_LEN] = NET_IF_IP;
+    hdr->checksum16 = udp_checksum(buf, src_ip, dst_ip);
+    ip_out(buf, dst_ip, NET_PROTOCOL_UDP);
 }
 
 /**
  * @brief 初始化udp协议
- * 
+ *
  */
 void udp_init()
 {
@@ -57,7 +123,7 @@ void udp_init()
 
 /**
  * @brief 打开一个udp端口并注册处理程序
- * 
+ *
  * @param port 端口号
  * @param handler 处理程序
  * @return int 成功为0，失败为-1
@@ -69,7 +135,7 @@ int udp_open(uint16_t port, udp_handler_t handler)
 
 /**
  * @brief 关闭一个udp端口
- * 
+ *
  * @param port 端口号
  */
 void udp_close(uint16_t port)
@@ -79,7 +145,7 @@ void udp_close(uint16_t port)
 
 /**
  * @brief 发送一个udp包
- * 
+ *
  * @param data 要发送的数据
  * @param len 数据长度
  * @param src_port 源端口号
