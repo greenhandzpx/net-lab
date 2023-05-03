@@ -88,34 +88,34 @@ static uint16_t add_two_num(uint16_t lhs, uint16_t rhs) {
  */
 uint16_t checksum16(uint16_t *data, size_t len)
 {
-    // // TO-DO
-    // uint32_t res = 0;
-    // for (size_t idx = 0; idx < len; idx += 2) {
-    //     // idx is counted by `byte`
-    //     uint16_t cur = 0;
-    //     if (idx == len - 1) {
-    //         // only 8bit left
-    //         cur = *((uint8_t *)data + idx);
-    //     } else {
-    //         cur = data[idx >> 1];
-    //     }
-    //     // res += cur;
-    //     res = add_two_num(res, cur);
-    // }
-    // return ~res;
- uint32_t cksum = 0;
-  while (len > 1) {
-    cksum += *data;
-    data++;
-    len -= sizeof(uint16_t);
-  }
+    // TO-DO
+    uint32_t res = 0;
+    for (size_t idx = 0; idx < len; idx += 2) {
+        // idx is counted by `byte`
+        uint16_t cur = 0;
+        if (idx == len - 1) {
+            // only 8bit left
+            cur = *((uint8_t *)data + idx);
+        } else {
+            cur = data[idx >> 1];
+        }
+        // res += cur;
+        res = add_two_num(res, cur);
+    }
+    return ~res;
+//  uint32_t cksum = 0;
+//   while (len > 1) {
+//     cksum += *data;
+//     data++;
+//     len -= sizeof(uint16_t);
+//   }
 
-  if (len == 1) {
-    cksum += *(uint8_t *)data;
-  }
+//   if (len == 1) {
+//     cksum += *(uint8_t *)data;
+//   }
 
-  while (cksum >> 16) {
-    cksum = (cksum >> 16) + (cksum & 0xffff);
-  }
-  return ~(uint16_t)cksum;
+//   while (cksum >> 16) {
+//     cksum = (cksum >> 16) + (cksum & 0xffff);
+//   }
+//   return ~(uint16_t)cksum;
 }
