@@ -82,7 +82,7 @@ void udp_in(buf_t *buf, uint8_t *src_ip)
         ip_hdr->hdr_checksum16 = 0;
         ip_hdr->hdr_checksum16 = checksum16((uint16_t *)ip_hdr, sizeof(ip_hdr_t));
 
-        icmp_unreachable(buf, src_ip, ICMP_TYPE_UNREACH);
+        icmp_unreachable(buf, src_ip, ICMP_CODE_PORT_UNREACH);
     } else {
         buf_remove_header(buf, sizeof(udp_hdr_t));
         (*handler)(buf->data, buf->len, src_ip, swap16(hdr->src_port16));
