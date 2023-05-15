@@ -63,7 +63,8 @@ void udp_in(buf_t *buf, uint8_t *src_ip)
         return;
     }
     hdr->checksum16 = checksum;
-    udp_handler_t *handler = (udp_handler_t *)map_get(&udp_table, swap16(hdr->dst_port16));
+    uint16_t dst_port = swap16(hdr->dst_port16);
+    udp_handler_t *handler = (udp_handler_t *)map_get(&udp_table, &dst_port);
     if (handler == NULL) {
         buf_add_header(buf, sizeof(ip_hdr_t));
         ip_hdr_t *ip_hdr = (ip_hdr_t *)(buf->data);

@@ -137,28 +137,52 @@ void http_server_run(void) {
         1、调用get_line从rx_buffer中获取一行数据，如果没有数据，则调用close_http关闭tcp，并继续循环
         */
 
-       // TODO
+        // TODO
+        int cnt = 0;
+        if ((cnt = get_line(tcp, c, 1024)) == 0) {
+            close_http(tcp);
+            continue;
+        }
 
 
         /*
         2、检查是否有GET请求，如果没有，则调用close_http关闭tcp，并继续循环
         */
 
-       // TODO
+        // TODO
+        if (cnt < 3) {
+            close_http(tcp);
+            continue;
+        }
+        if (!(c[0] == 'G' && c[1] == 'E' && c[2] == 'T')) {
+            close_http(tcp);
+            continue;
+        }
 
 
         /*
         3、解析GET请求的路径，注意跳过空格，找到GET请求的文件，调用send_file发送文件
         */
 
-       // TODO
-
+        // TODO
+        printf("first line: %s\n", c);
+        int start_idx = -1;
+        for (int i = 0; i < cnt; ++i) {
+            if (c[i] == '/' && start_idx != -1) {
+                start_idx = i;
+            }
+            if (c[i] == ' ' && start_idx != -1) {
+                break;
+            }
+        }
+        send_file(tcp, &c[start_idx]);
 
         /*
         4、调用close_http关掉连接
         */
 
-       // TODO
+        // TODO
+        close_http(tcp);
 
 
         printf("!! final close\n");

@@ -6,7 +6,6 @@
 #include "arp.h"
 #include "icmp.h"
 #include "utils.h"
-#include <bits/stdint-uintn.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -48,7 +47,7 @@ void ip_in(buf_t *buf, uint8_t *src_mac)
     }
     uint8_t protocol = hdr->protocol;
 
-    if (protocol != NET_PROTOCOL_ICMP && protocol != NET_PROTOCOL_UDP) {
+    if (protocol != NET_PROTOCOL_ICMP && protocol != NET_PROTOCOL_UDP && protocol != NET_PROTOCOL_TCP) {
         icmp_unreachable(buf, hdr->src_ip, ICMP_CODE_PROTOCOL_UNREACH);
     }
     

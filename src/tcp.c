@@ -1,5 +1,4 @@
 #include <assert.h>
-#include <bits/stdint-uintn.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -83,7 +82,7 @@ int tcp_open(uint16_t port, tcp_handler_t handler) {
  * @brief 完成了缓存分配工作，状态也会切换为TCP_SYN_RCVD
  *        rx_buf和tx_buf在触及边界时会把数据重新移动到头部，防止溢出。
  *
- * @param connect
+ * @param connect   
  */
 static void init_tcp_connect_rcvd(tcp_connect_t* connect) {
     if (connect->state == TCP_LISTEN) {
@@ -288,7 +287,7 @@ size_t tcp_connect_write(tcp_connect_t* connect, const uint8_t* data, size_t len
  * @param src_ip
  */
 void tcp_in(buf_t* buf, uint8_t* src_ip) {
-    // printf("<<< tcp_in >>>\n");
+    printf("<<< tcp_in >>>\n");
 
     /*
     1、大小检查，检查buf长度是否小于tcp头部，如果是，则丢弃
@@ -310,6 +309,7 @@ void tcp_in(buf_t* buf, uint8_t* src_ip) {
 
     uint8_t dst_ip[NET_IP_LEN] = NET_IF_IP;
     if (checksum != tcp_checksum(buf, src_ip, dst_ip)) {
+        printf("checksum failed\n");
         return;
     }
     hdr->chunksum16 = checksum;
@@ -337,6 +337,7 @@ void tcp_in(buf_t* buf, uint8_t* src_ip) {
     // TODO
     tcp_handler_t *handler = (tcp_handler_t *)map_get(&tcp_table, &dst_port);
     if (handler == NULL) {
+        printf("tcp_in: no handler for port %d\n", dst_port);
         buf_add_header(buf, sizeof(ip_hdr_t));
         ip_hdr_t *ip_hdr = (ip_hdr_t *)(buf->data);
         ip_hdr->hdr_len = 5;
@@ -375,6 +376,7 @@ void tcp_in(buf_t* buf, uint8_t* src_ip) {
     // TODO
     tcp_connect_t *connect = (tcp_connect_t *)map_get(&connect_table, &tcp_key);
     if (connect == NULL) {
+        printf("tcp_in: construct a new connect\n");
         tcp_connect_t new_conn = CONNECT_LISTEN;
         map_set(&connect_table, &tcp_key, &new_conn);
         connect = map_get(&connect_table, &tcp_key);
@@ -408,13 +410,14 @@ void tcp_in(buf_t* buf, uint8_t* src_ip) {
             goto close_tcp;
         }
         if (!flags.syn) {
+            printf("TCP_LISTEN: no syn\n");
             goto reset_tcp;
         }
         init_tcp_connect_rcvd(connect);
         connect->local_port = dst_port;
         connect->remote_port = src_port;
         memcpy(connect->ip, src_ip, NET_IP_LEN);
-        connect->unack_seq = random() % UINT32_MAX;
+        connect->unack_seq = rand() % UINT32_MAX;
         connect->next_seq = connect->unack_seq;
         // TODO: not sure
         connect->ack = seq_no + 1;
@@ -433,6 +436,7 @@ void tcp_in(buf_t* buf, uint8_t* src_ip) {
     // TODO
     if (seq_no != connect->ack) {
         // TODO: not sure
+        printf("seq no %d not equal to ack no %d\n", seq_no, connect->ack);
         goto reset_tcp;
     }
 
@@ -481,6 +485,7 @@ void tcp_in(buf_t* buf, uint8_t* src_ip) {
         // TODO
         connect->unack_seq++;
         connect->state = TCP_ESTABLISHED;
+        printf("tcp_in: establish the connect\n");
         (*handler)(connect, TCP_CONN_CONNECTED);
         // TODO: not sure
         return;
@@ -494,6 +499,7 @@ void tcp_in(buf_t* buf, uint8_t* src_ip) {
 
         // TODO
         if (!flags.ack && !flags.fin) {
+            printf("TCP_ESTABLISHED: no ack && no fin\n");
             return;
         }
 
@@ -511,6 +517,7 @@ void tcp_in(buf_t* buf, uint8_t* src_ip) {
         if (flags.ack) {
             // TODO: not sure
             if (connect->unack_seq < ack_no && connect->next_seq > ack_no) {
+                printf("TCP_ESTABLISHED: ack no: %d\n", ack_no);
                 buf_remove_header(connect->tx_buf, ack_no - connect->unack_seq);
                 connect->unack_seq = ack_no;
             }
@@ -523,7 +530,7 @@ void tcp_in(buf_t* buf, uint8_t* src_ip) {
         */
 
         // TODO
-        tcp_read_from_buf(connect, buf);
+        uint16_t read_bytes = tcp_read_from_buf(connect, buf);
 
         /*
         17、再然后，根据当前的标志位进一步处理
@@ -545,7 +552,13 @@ void tcp_in(buf_t* buf, uint8_t* src_ip) {
             return;
         }
 
+        if (read_bytes > 0) {
+            (*handler)(connect, TCP_CONN_DATA_RECV);
+            // TODO: not sure
+            // connect->ack += read_bytes;
+        }
         if (tcp_write_to_buf(connect, &txbuf) > 0) {
+            printf("tcp_in: tcp_send %d bytes\n", txbuf.len);
             tcp_send(&txbuf, connect, tcp_flags_ack);
         }
         
