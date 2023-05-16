@@ -277,6 +277,10 @@ size_t tcp_connect_write(tcp_connect_t* connect, const uint8_t* data, size_t len
         return 0;
     }
     memcpy(dst, data, size);
+    // for (int i = 0; i < size; ++i) {
+    //     printf("%02x ", data[i]);
+    // }
+    // printf("\n");
     return size;
 }
 

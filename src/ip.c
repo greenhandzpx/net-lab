@@ -68,6 +68,7 @@ void ip_in(buf_t *buf, uint8_t *src_mac)
  */
 void ip_fragment_out(buf_t *buf, uint8_t *ip, net_protocol_t protocol, int id, uint16_t offset, int mf)
 {
+    printf("ip fragment out\n ");
     // TO-DO
     buf_add_header(buf, sizeof(ip_hdr_t));
     ip_hdr_t *hdr = (ip_hdr_t *)(buf->data);

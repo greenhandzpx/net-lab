@@ -171,6 +171,7 @@ void arp_in(buf_t *buf, uint8_t *src_mac)
 void arp_out(buf_t *buf, uint8_t *ip)
 {
     // TO-DO
+    printf("arp out\n");
     uint8_t *mac = map_get(&arp_table, ip);
     if (mac) {
         // TODO: not sure

@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdio.h>
 #include "map.h"
 
 /**
@@ -101,8 +102,10 @@ int map_set(map_t *map, const void *key, const void *value)
         *(time_t *)(old_value + map->value_len) = time(NULL);
         return 0;
     }
-    if (map->size == map->max_size)
+    if (map->size == map->max_size) {
+        printf("map full\n");
         return -1;
+    }
     for (size_t i = 0; i < map->max_size; i++)
     {
         uint8_t *entry = map_entry_get(map, i);

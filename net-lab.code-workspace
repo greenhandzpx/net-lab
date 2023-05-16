@@ -5,6 +5,12 @@
 		}
 	],
 	"settings": {
-		"cmake.generator": "MinGW Makefiles"
+		"cmake.generator": "MinGW Makefiles",
+		"files.associations": {
+			"array": "c",
+			"string": "c",
+			"string_view": "c",
+			"ranges": "c"
+		}
 	}
 }

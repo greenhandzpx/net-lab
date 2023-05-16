@@ -29,6 +29,7 @@ void ethernet_in(buf_t *buf)
  */
 void ethernet_out(buf_t *buf, const uint8_t *mac, net_protocol_t protocol)
 {
+    printf("ethernet out\n");
     // TO-DO
     if (buf->len < ETHERNET_MIN_TRANSPORT_UNIT) {
         buf_add_padding(buf, ETHERNET_MIN_TRANSPORT_UNIT - buf->len);

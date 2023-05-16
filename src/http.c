@@ -65,8 +65,11 @@ static size_t get_line(tcp_connect_t* tcp, char* buf, size_t size) {
 
 static size_t http_send(tcp_connect_t* tcp, const char* buf, size_t size) {
     size_t send = 0;
+    printf("http_send: size %lld\n", size);
     while (send < size) {
-        send += tcp_connect_write(tcp, (const uint8_t*)buf + send, size - send);
+        size_t cnt = tcp_connect_write(tcp, (const uint8_t*)buf + send, size - send);
+        printf("http_send: cnt %lld\n", cnt);
+        send += cnt;
         net_poll();
     }
     return send;
@@ -81,11 +84,15 @@ static void close_http(tcp_connect_t* tcp) {
 
 static void send_file(tcp_connect_t* tcp, const char* url) {
     FILE* file;
-    uint32_t size;
+    uint32_t size = 0;
+
+    size_t max_file_size = 30000;
     // const char* content_type = "text/html";
     char file_path[255];
-    char tx_buffer[1024];
-
+    char *tx_buffer = malloc(max_file_size);
+    memset(tx_buffer, 0, max_file_size);
+    char *content = malloc(max_file_size);
+    memset(content, 0, max_file_size);
     /*
     解析url路径，查看是否是查看XHTTP_DOC_DIR目录下的文件
     如果不是，则发送404 NOT FOUND
@@ -95,7 +102,62 @@ static void send_file(tcp_connect_t* tcp, const char* url) {
     */
 
    // TODO
+    printf("url %s\n", url);
+        // sprintf(tx_buffer, "HTTP/1.0 ")
+        // FILE *file = fopen("../htmldocs/index.html", "r+");
+        // // bytes = fread(tx_buffer, sizeof(char), 1024, file);
+        // sprintf(tx_buffer, "hello world");
+        // bytes = strlen(tx_buffer);
+        // printf("read %lld bytes\n", bytes);
 
+    if (strcmp(url, "/") == 0 || strcmp(url, "/index.html") == 0
+        || strcmp(url, "/img1.jpg") == 0
+        || strcmp(url, "/img2.jpg") == 0
+        || strcmp(url, "/img3.jpg") == 0
+        || strcmp(url, "/img4.jpg") == 0
+        || strcmp(url, "/img5.jpg") == 0
+        || strcmp(url, "/img6.jpg") == 0
+        || strcmp(url, "/page1.html") == 0) {
+        strcpy(file_path, XHTTP_DOC_DIR);
+        if (strcmp(url, "/") == 0) {
+            strcat(file_path, "/index.html");
+        } else {
+            strcat(file_path, url);
+        }
+        printf("file path %s\n", file_path);
+        FILE *file = fopen(file_path, "rb");
+        if (file == NULL) {
+            printf("read file fail\n");
+        }
+        // strcat(tx_buffer, "hello world");
+        // size = strlen(tx_buffer);
+        size_t read_bytes = fread(content, sizeof(char), max_file_size, file);
+        printf("content length %lld\n", read_bytes);
+        strcpy(tx_buffer, "HTTP/1.0 200 OK\r\n");
+        if (
+            strcmp(url, "/img1.jpg") == 0
+            || strcmp(url, "/img2.jpg") == 0
+            || strcmp(url, "/img3.jpg") == 0
+            || strcmp(url, "/img4.jpg") == 0
+            || strcmp(url, "/img5.jpg") == 0
+            || strcmp(url, "/img6.jpg") == 0
+        ) {
+            strcat(tx_buffer, "Content-Type: image/png \r\n");
+        }
+        sprintf(tx_buffer + strlen(tx_buffer), "Content-Length: %lld\r\n\r\n", read_bytes);
+        size = strlen(tx_buffer);
+        memcpy(tx_buffer + strlen(tx_buffer), content, read_bytes);
+        size += read_bytes;
+    } else {
+        strcpy(tx_buffer, "HTTP/1.0 404 NOTFOUND\r\n \r\n\r\n");
+        strcat(tx_buffer, "404 NOT FOUND");
+        size = strlen(tx_buffer);
+    }
+    // size = strlen(tx_buffer);
+    http_send(tcp, tx_buffer, size);
+
+    free(tx_buffer);
+    free(content);
 }
 
 static void http_handler(tcp_connect_t* tcp, connect_state_t state) {
@@ -114,9 +176,11 @@ static void http_handler(tcp_connect_t* tcp, connect_state_t state) {
 // 在端口上创建服务器。
 
 int http_server_open(uint16_t port) {
-    if (!tcp_open(port, http_handler)) {
+    if (tcp_open(port, http_handler)) {
+        printf("cannot open http server\n");
         return -1;
     }
+    printf("http server open\n");
     http_fifo_init(&http_fifo_v);
     return 0;
 }
@@ -128,10 +192,13 @@ void http_server_run(void) {
     char url_path[255];
     char rx_buffer[1024];
 
+    // printf("http server run\n");
+
     while ((tcp = http_fifo_out(&http_fifo_v)) != NULL) {
         int i;
         char* c = rx_buffer;
 
+        printf("fetch a tcp from fifo\n");
 
         /*
         1、调用get_line从rx_buffer中获取一行数据，如果没有数据，则调用close_http关闭tcp，并继续循环
@@ -167,15 +234,21 @@ void http_server_run(void) {
         // TODO
         printf("first line: %s\n", c);
         int start_idx = -1;
+        int n = 0;
         for (int i = 0; i < cnt; ++i) {
-            if (c[i] == '/' && start_idx != -1) {
+            if (c[i] == '/' && start_idx == -1) {
                 start_idx = i;
             }
             if (c[i] == ' ' && start_idx != -1) {
+                n = i - start_idx;
                 break;
             }
         }
-        send_file(tcp, &c[start_idx]);
+        printf("start idx %d, n %d\n", start_idx, n);
+        snprintf(url_path, n + 1, &c[start_idx]);
+        // printf("url_path %c\n", c[start_idx]);
+        // printf("url_path %c\n", url_path[0]);
+        send_file(tcp, url_path);
 
         /*
         4、调用close_http关掉连接
